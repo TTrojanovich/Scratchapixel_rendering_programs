@@ -1,26 +1,168 @@
-#define RASTERIZATION_
+#define RASTERIZATION_1
 #ifdef RASTERIZATION_1
-
 #define _USE_MATH_DEFINES
-#include "geometry.h"
+
 #include <fstream>
+#include <sstream>
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include "../headers/geometry.h"
+#include "../data/cow.h"
 
-#include "cow.h"
+using namespace std;
+
 
 static const float inchToMm = 25.4f;
-enum class FitResolutionGate { kFill = 0, kOverscan };
+enum class FitResolutionGate { kFill, kOverscan };
 
+float min3(const float& a, const float& b, const float& c)
+{
+	return std::min(a, std::min(b, c));
+}
+
+float max3(const float& a, const float& b, const float& c)
+{
+	return std::max(a, std::max(b, c));
+}
+
+float edgeFunction(const Vec3f& a, const Vec3f& b, const Vec3f& c)
+{
+	return (c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]);
+}
+
+class Parameters
+{
+public:
+	int width;
+	int height;
+	int WidMultHeig;
+	Matrix44f worldToCamera;
+	Matrix44f camToWorld;
+	Vec3f cam_origin;
+	Vec3f cam_direction;
+	int ntris; // = 3156;
+	const float nearClippingPLane = 1;
+	const float farClippingPLane = 1000;
+	float focalLength = 40;
+	float filmApertureWidth = 0.980f;
+	float filmApertureHeight = 0.735f;
+	unique_ptr<Vec3f[]> vertices;
+	unique_ptr<Vec2f[]> st;
+	unique_ptr<int[]> nvertices;
+	float l, r, b, t;
+
+	Parameters(int width, int height, Matrix44f worldToCamera, Matrix44f camToWorld, Vec3f cam_origin, Vec3f cam_direction)
+	{
+		this->width = width;
+		this->height = height;
+		this->WidMultHeig = width * height;
+		this->worldToCamera = worldToCamera;
+		this->camToWorld = camToWorld;
+		this->cam_origin = cam_origin;
+		this->cam_direction = cam_direction;
+	}
+};
+
+
+Matrix44f LookAt(const Vec3f& origin, const Vec3f& target, const Vec3f& up_temp = Vec3f(0, 1, 0))
+{
+	Vec3f up_temp_normalize = Vec3f(up_temp).normalize();
+	Vec3f forward = Vec3f(origin - target).normalize();
+	Vec3f right = up_temp_normalize.crossProduct(forward);
+	Vec3f up = forward.crossProduct(right);
+
+	Matrix44f camToWorld;
+
+	camToWorld[0][0] = right.x;
+	camToWorld[0][1] = right.y;
+	camToWorld[0][2] = right.z;
+	camToWorld[1][0] = up.x;
+	camToWorld[1][1] = up.y;
+	camToWorld[1][2] = up.z;
+	camToWorld[2][0] = forward.x;
+	camToWorld[2][1] = forward.y;
+	camToWorld[2][2] = forward.z;
+	camToWorld[3][0] = origin.x;
+	camToWorld[3][1] = origin.y;
+	camToWorld[3][2] = origin.z;
+
+	return camToWorld;
+}
+
+
+void loadGeoFile
+(
+	const char* file,
+	int& numFaces,
+	unique_ptr<Vec3f[]>& verts,
+	unique_ptr<Vec2f[]>& st,
+	unique_ptr<int[]>& vertsIndex
+)
+{
+	ifstream ifs;
+
+	try 
+	{
+		ifs.open(file);
+		if (ifs.fail()) throw;
+
+		stringstream ss;
+		ss << ifs.rdbuf();
+		ss >> numFaces;
+		int vertsIndexArraySize = 0;
+		
+		for (int i = 0; i < numFaces; ++i) 
+		{
+			int tmp;
+			ss >> tmp; //faceIndex[i];
+			vertsIndexArraySize += tmp;
+		}
+
+		vertsIndex = unique_ptr<int[]>(new int[vertsIndexArraySize]);
+		
+		int vertsArraySize = 0;
+		for (int i = 0; i < vertsIndexArraySize; ++i) 
+		{
+			ss >> vertsIndex[i];
+			if (vertsIndex[i] > vertsArraySize) vertsArraySize = vertsIndex[i];
+		}
+		vertsArraySize += 1;
+		
+		verts = unique_ptr<Vec3f[]>(new Vec3f[vertsArraySize]);
+		for (int i = 0; i < vertsArraySize; ++i)
+		{
+			ss >> verts[i].x >> verts[i].y >> verts[i].z;
+		}
+		
+		for (int i = 0; i < vertsIndexArraySize; ++i)
+		{
+			Vec3f normal;
+			ss >> normal.x >> normal.y >> normal.z;
+		}
+		
+		st = unique_ptr<Vec2f[]>(new Vec2f[vertsIndexArraySize]);
+		for (int i = 0; i < vertsIndexArraySize; ++i)
+		{
+			ss >> st[i].x >> st[i].y;
+		}
+	}
+
+	catch (...)
+	{
+		ifs.close();
+	}
+	
+	ifs.close();
+}
 
 
 void computeScreenCoordinates
 (
 	const float& filmApertureWidth,
 	const float& filmApertureHeight,
-	const uint32_t& imageWidth,
-	const uint32_t& imageHeight,
+	const int& imageWidth,
+	const int& imageHeight,
 	const FitResolutionGate& fitFilm,
 	const float& nearClippingPLane,
 	const float& focalLength,
@@ -32,10 +174,6 @@ void computeScreenCoordinates
 
 	top = ((filmApertureHeight * inchToMm / 2) / focalLength) * nearClippingPLane;
 	right = ((filmApertureWidth * inchToMm / 2) / focalLength) * nearClippingPLane;
-
-	// field of view (horizontal)
-	float fov = 2 * 180 / (float)M_PI * atan((filmApertureWidth * inchToMm / 2) / focalLength);
-	std::cerr << "Field of view " << fov << std::endl;
 
 	float xscale = 1;
 	float yscale = 1;
@@ -81,8 +219,8 @@ void convertToRaster
 	const float& t,
 	const float& b,
 	const float& near,
-	const uint32_t& imageWidth,
-	const uint32_t& imageHeight,
+	const int& imageWidth,
+	const int& imageHeight,
 	Vec3f& vertexRaster
 )
 {
@@ -103,67 +241,27 @@ void convertToRaster
 	vertexRaster.z = -vertexCamera.z;
 }
 
-float min3(const float &a, const float &b, const float &c)
-{ return std::min(a, std::min(b, c)); }
 
-float max3(const float &a, const float &b, const float &c)
-{ return std::max(a, std::max(b, c)); }
-
-float edgeFunction(const Vec3f &a, const Vec3f &b, const Vec3f &c)
-{ return (c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]); }
-
-const uint32_t imageWidth = 640;
-const uint32_t imageHeight = 480;
-const Matrix44f worldToCamera = {0.707107f, -0.331295f, 0.624695f, 0.f, 0.f, 0.883452f, 0.468521f, 0.f, -0.707107f, -0.331295f, 0.624695f, 0.f, -1.63871f, -5.747777f, -40.400412f, 1.f};
-
-const uint32_t ntris = 3156;
-const float nearClippingPLane = 1;
-const float farClippingPLane = 1000;
-float focalLength = 40; // in mm
-// 35mm Full Aperture in inches
-float filmApertureWidth = 0.980f;
-float filmApertureHeight = 0.735f;
-
-
-
-
-int main(int argc, char** argv)
+void render(const Parameters& param)
 {
-	Matrix44f cameraToWorld = worldToCamera.inverse();
-
-	float t, b, l, r;
-
-	computeScreenCoordinates
-	(
-		filmApertureWidth, filmApertureHeight,
-		imageWidth, imageHeight,
-		FitResolutionGate::kOverscan,
-		nearClippingPLane,
-		focalLength,
-		t, b, l, r
-	);
-
-
-	Vec3<unsigned char>* frameBuffer = new Vec3<unsigned char>[imageWidth * imageHeight];
-	for (uint32_t i = 0; i < imageWidth * imageHeight; ++i)
+	Vec3<unsigned char>* frameBuffer = new Vec3<unsigned char>[param.WidMultHeig];
+	for (int i = 0; i < param.WidMultHeig; ++i)
 		frameBuffer[i] = Vec3<unsigned char>(0);
 
-	float* depthBuffer = new float[imageWidth * imageHeight];
-	for (uint32_t i = 0; i < imageWidth * imageHeight; ++i)
-		depthBuffer[i] = farClippingPLane;
+	float* depthBuffer = new float[param.WidMultHeig];
+	for (int i = 0; i < param.WidMultHeig; ++i) depthBuffer[i] = param.farClippingPLane;
 
-	auto t_start = std::chrono::high_resolution_clock::now();
 
-	for (uint32_t i = 0; i < ntris; ++i)
+	for (int i = 0; i < param.ntris; ++i)
 	{
 		const Vec3f& v0 = vertices[nvertices[i * 3]];
 		const Vec3f& v1 = vertices[nvertices[i * 3 + 1]];
 		const Vec3f& v2 = vertices[nvertices[i * 3 + 2]];
 
 		Vec3f v0Raster, v1Raster, v2Raster;
-		convertToRaster(v0, worldToCamera, l, r, t, b, nearClippingPLane, imageWidth, imageHeight, v0Raster);
-		convertToRaster(v1, worldToCamera, l, r, t, b, nearClippingPLane, imageWidth, imageHeight, v1Raster);
-		convertToRaster(v2, worldToCamera, l, r, t, b, nearClippingPLane, imageWidth, imageHeight, v2Raster);
+		convertToRaster(v0, param.worldToCamera, param.l, param.r, param.t, param.b, param.nearClippingPLane, param.width, param.height, v0Raster);
+		convertToRaster(v1, param.worldToCamera, param.l, param.r, param.t, param.b, param.nearClippingPLane, param.width, param.height, v1Raster);
+		convertToRaster(v2, param.worldToCamera, param.l, param.r, param.t, param.b, param.nearClippingPLane, param.width, param.height, v2Raster);
 
 		v0Raster.z = 1 / v0Raster.z,
 		v1Raster.z = 1 / v1Raster.z,
@@ -180,20 +278,19 @@ int main(int argc, char** argv)
 		float xmax = max3(v0Raster.x, v1Raster.x, v2Raster.x);
 		float ymax = max3(v0Raster.y, v1Raster.y, v2Raster.y);
 
-		// the triangle is out of screen
-		if (xmin > imageWidth - 1 || xmax < 0 || ymin > imageHeight - 1 || ymax < 0) continue;
+		if (xmin > param.width - 1 || xmax < 0 || ymin > param.height - 1 || ymax < 0) continue;
 
-		uint32_t x0 = std::max(int32_t(0), (int32_t)(std::floor(xmin)));
-		uint32_t x1 = std::min(int32_t(imageWidth) - 1, (int32_t)(std::floor(xmax)));
-		uint32_t y0 = std::max(int32_t(0), (int32_t)(std::floor(ymin)));
-		uint32_t y1 = std::min(int32_t(imageHeight) - 1, (int32_t)(std::floor(ymax)));
+		int x0 = max(int(0), (int)(floor(xmin)));
+		int x1 = min(int(param.width) - 1, (int)(floor(xmax)));
+		int y0 = max(int(0), (int)(floor(ymin)));
+		int y1 = min(int(param.height) - 1, (int)(floor(ymax)));
 
 		float area = edgeFunction(v0Raster, v1Raster, v2Raster);
 
 
-		for (uint32_t y = y0; y <= y1; ++y)
+		for (int y = y0; y <= y1; ++y)
 		{
-			for (uint32_t x = x0; x <= x1; ++x)
+			for (int x = x0; x <= x1; ++x)
 			{
 				Vec3f pixelSample_1(x + 0.25f, y + 0.25f, 0.f);
 				Vec3f pixelSample_2(x + 0.75f, y + 0.25f, 0.f);
@@ -214,13 +311,13 @@ int main(int argc, char** argv)
 				float w2_2 = edgeFunction(v0Raster, v1Raster, pixelSample_2);
 				float w2_3 = edgeFunction(v0Raster, v1Raster, pixelSample_3);
 				float w2_4 = edgeFunction(v0Raster, v1Raster, pixelSample_4);
-				
+
 				Vec3f pixelSample(x + 0.5f, y + 0.5f, 0.f);
 				float w0 = edgeFunction(v1Raster, v2Raster, pixelSample);
 				float w1 = edgeFunction(v2Raster, v0Raster, pixelSample);
 				float w2 = edgeFunction(v0Raster, v1Raster, pixelSample);
-				
-				
+
+
 				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
 				{
 					w0 /= area;
@@ -228,20 +325,20 @@ int main(int argc, char** argv)
 					w2 /= area;
 					float z = 1 / (v0Raster.z * w0 + v1Raster.z * w1 + v2Raster.z * w2);
 
-					if (z < depthBuffer[y * imageWidth + x])
+					if (z < depthBuffer[y * param.width + x])
 					{
-						depthBuffer[y * imageWidth + x] = z;
+						depthBuffer[y * param.width + x] = z;
 
 						float nDotView_1 = -1, nDotView_2 = -1, nDotView_3 = -1, nDotView_4 = -1;
 
 						if (w0_1 >= 0 && w1_1 >= 0 && w2_1 >= 0) { w0_1 /= area; w1_1 /= area; w2_1 /= area; }
-						else { nDotView_1 = 1;  }
+						else { nDotView_1 = 1; }
 						if (w0_2 >= 0 && w1_2 >= 0 && w2_2 >= 0) { w0_2 /= area; w1_2 /= area; w2_2 /= area; }
-						else { nDotView_2 = 1;  }
+						else { nDotView_2 = 1; }
 						if (w0_3 >= 0 && w1_3 >= 0 && w2_3 >= 0) { w0_3 /= area; w1_3 /= area; w2_3 /= area; }
-						else { nDotView_3 = 1;  }
+						else { nDotView_3 = 1; }
 						if (w0_4 >= 0 && w1_4 >= 0 && w2_4 >= 0) { w0_4 /= area; w1_4 /= area; w2_4 /= area; }
-						else { nDotView_4 = 1;  }
+						else { nDotView_4 = 1; }
 
 						Vec2f st_1 = st0 * w0_1 + st1 * w1_1 + st2 * w2_1;
 						Vec2f st_2 = st0 * w0_2 + st1 * w1_2 + st2 * w2_2;
@@ -266,39 +363,57 @@ int main(int argc, char** argv)
 						float c_3 = 0.3f * (1.f - checker_3) + 0.7f * checker_3;
 						float c_4 = 0.3f * (1.f - checker_4) + 0.7f * checker_4;
 
-						//if (nDotView_1 + nDotView_2 + nDotView_3 + nDotView_4 == -4)
-						{
-							if (nDotView_1 == -1) nDotView_1 = c_1;
-							if (nDotView_2 == -1) nDotView_2 = c_2;
-							if (nDotView_3 == -1) nDotView_3 = c_3;
-							if (nDotView_4 == -1) nDotView_4 = c_4;
+						if (nDotView_1 == -1) nDotView_1 = c_1;
+						if (nDotView_2 == -1) nDotView_2 = c_2;
+						if (nDotView_3 == -1) nDotView_3 = c_3;
+						if (nDotView_4 == -1) nDotView_4 = c_4;
 
-							float nDotView = (nDotView_1 + nDotView_2 + nDotView_3 + nDotView_4) / 4;
+						float nDotView = (nDotView_1 + nDotView_2 + nDotView_3 + nDotView_4) / 4;
 
-							frameBuffer[y * imageWidth + x].x = (unsigned char)(nDotView * 255.0f);
-							frameBuffer[y * imageWidth + x].y = (unsigned char)(nDotView * 255.0f);
-							frameBuffer[y * imageWidth + x].z = (unsigned char)(nDotView * 255.0f);
-						}
+						frameBuffer[y * param.width + x].x = (unsigned char)(nDotView * 255.0f);
+						frameBuffer[y * param.width + x].y = (unsigned char)(nDotView * 255.0f);
+						frameBuffer[y * param.width + x].z = (unsigned char)(nDotView * 255.0f);
 					}
 				}
-				
+
 			}
 		}
 	}
 
-
-	auto t_end = std::chrono::high_resolution_clock::now();
-	auto passedTime = std::chrono::duration<double, std::milli>(t_end - t_start).count();
-	std::cerr << "Wall passed time:  " << passedTime << " ms" << std::endl;
-
 	std::ofstream ofs;
 	ofs.open("rasterization_out.ppm");
-	ofs << "P6\n" << imageWidth << " " << imageHeight << "\n255\n";
-	ofs.write((char*)frameBuffer, imageWidth * imageWidth * 3);
+	ofs << "P6\n" << param.width << " " << param.height << "\n255\n";
+	ofs.write((char*)frameBuffer, param.WidMultHeig * 3.0f);
 	ofs.close();
 
 	delete[] frameBuffer;
 	delete[] depthBuffer;
+}
+
+
+int main(int argc, char** argv)
+{
+	Matrix44f camToWorld;
+	Vec3f cam_origin(20, 15, 25), cam_target(0, 5, -1);
+	camToWorld = LookAt(cam_origin, cam_target);
+	Matrix44f worldToCamera = camToWorld.inverse();
+
+	Parameters param(800, 800, worldToCamera, camToWorld, cam_origin, cam_target);
+
+	loadGeoFile("data/cow.geo", param.ntris, param.vertices, param.st, param.nvertices);
+
+	float t, b, l, r;
+	computeScreenCoordinates
+	(
+		param.filmApertureWidth, param.filmApertureHeight,
+		param.width, param.height,
+		FitResolutionGate::kOverscan,
+		param.nearClippingPLane,
+		param.focalLength,
+		param.t, param.b, param.l, param.r
+	);
+
+	render(param);
 
 	return 0;
 }
