@@ -1,2 +1,3 @@
 *.h linguist-detectable=false
+*.geo linguist-detectable=false
 *.cpp linguist-detectable=true
