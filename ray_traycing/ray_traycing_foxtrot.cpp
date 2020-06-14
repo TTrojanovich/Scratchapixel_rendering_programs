@@ -57,7 +57,7 @@ bool rayTriangleIntersectMT(const Vec3f& origin, const Vec3f& direction, const V
 
 	t = v0v2.dotProduct(Qvec) * invDet;
 
-	return (t > 0) ? true : false; // ???????????????????????????
+	return (t > 0) ? true : false;
 }
 
 
@@ -532,7 +532,6 @@ Vec3f refract(const Vec3f& I, const Vec3f& N, const float& refractIndex)
 		n = -N;
 	}
 	float refrIndex = refrIndex_src / refrIndex_dst;
-	// ???????????????????????????
 	float k = 1 - refrIndex * refrIndex * (1 - cos_src * cos_src);
 	return k < 0 ? 0 : refrIndex * I + (refrIndex * cos_src - sqrtf(k)) * n;
 }
