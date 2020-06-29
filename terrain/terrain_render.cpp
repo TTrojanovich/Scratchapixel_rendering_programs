@@ -1,4 +1,4 @@
-#define TERRAIN_RENDER_1
+#define TERRAIN_RENDER_
 #ifdef TERRAIN_RENDER_1
 
 #include "terrain_header.h"

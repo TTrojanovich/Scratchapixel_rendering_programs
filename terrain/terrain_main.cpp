@@ -1,4 +1,4 @@
-#define TERRAIN_PERLIN_IMPROVED_1
+#define TERRAIN_PERLIN_IMPROVED_
 #ifdef TERRAIN_PERLIN_IMPROVED_1
 
 #include "terrain_header.h"
@@ -124,7 +124,8 @@ int main()
 	
 	//PerlinNoise noise;
 	//FractalNoise noise;
-	MarbleNoise noise;
+	//MarbleNoise noise;
+	WoodNoise noise;
 	
 	PolyMesh* poly = createPolyMesh(objToWorld, noise, 10, 10, 40, 40);
 	
@@ -143,6 +144,7 @@ int main()
 	if (noise.getType() == "Perlin") FileName = "terrain_render_perlin_out.ppm";
 	if (noise.getType() == "Fractal") FileName = "terrain_render_fractal_out.ppm";
 	if (noise.getType() == "Marble") FileName = "terrain_render_marble_out.ppm";
+	if (noise.getType() == "Wood") FileName = "terrain_render_wood_out.ppm";
 	render(parameters, objects, FileName);
 
 	noise.print(imgW, imgH);

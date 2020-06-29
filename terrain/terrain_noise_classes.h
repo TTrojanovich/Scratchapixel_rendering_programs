@@ -299,4 +299,49 @@ public:
 };
 
 
+class WoodNoise : public PerlinNoise
+{
+public:
+
+	float eval(const Vec3f& p) const
+	{
+		Vec3f p_tmp = p;
+		float frequency = 0.01f;
+		
+		float g = (PerlinNoise::eval(Vec3f(p_tmp * frequency)) + 1.f) * 0.5f * 20;
+		return g - (int)g;
+	}
+
+	void print(const int& imgW, const int& imgH) const
+	{
+		float* noiseMap = new float[imgW * (long long)imgH]{ 0 };
+		string FileName = "terrain_wood.ppm";
+
+		float frequency = 0.01f;
+		for (int j = 0; j < imgH; ++j)
+		{
+			for (int i = 0; i < imgW; ++i)
+			{
+				float g = (PerlinNoise::eval(Vec3f((float)i, 0, (float)j) * frequency) + 1.f) * 0.5f * 20;
+				noiseMap[j * imgW + i] = g - (int)g;
+			}
+		}
+
+		ofstream ofs(FileName, ios::out | ios::binary);
+		ofs << "P6\n" << imgW << " " << imgH << "\n255\n";
+		for (int i = 0; i < imgW * imgH; ++i)
+		{
+			unsigned char n = static_cast<unsigned char>(noiseMap[i] * 255);
+			ofs << n << n << n;
+		}
+		ofs.close();
+		delete[] noiseMap;
+	}
+
+	string getType() const
+	{
+		return "Wood";
+	}
+};
+
 
