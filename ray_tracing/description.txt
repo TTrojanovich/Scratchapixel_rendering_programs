@@ -1,0 +1,17 @@
+===== RAY TRACERS FUNCTIONALITY DESCRIPTION =====
+
+_ALPHA = GEOMETRIC SPHERE ONLY
+
+_BETA = GEOMETRIC TRIANGLES ONLY
+
+_DELTA = AABBox + LoadPolyMesh + Simple TriangleMesh Render with Barycentric Coordinates
+
+_ECHO = _DELTA + Object Coordinate System
+
+_FOXTROT = _ECHO + Light(Distant and Point) +  Material_Type(DIFFUSE, REFLECTIONS, REFRACTIONS)
+
+_GAMMA = _FOXTROT + Phong Model
+
+_HUNTER = _GAMMA + Global Illumination
+
+_OMICRON = _HUNTER + Additional Accelerations
