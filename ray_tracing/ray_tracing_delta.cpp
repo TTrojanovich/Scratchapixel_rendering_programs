@@ -1,5 +1,5 @@
-#define RAY_TRAYCER_ECHO_
-#ifdef RAY_TRAYCER_ECHO_1
+#define RAY_TRACER_DELTA_
+#ifdef RAY_TRACER_DELTA_1
 #define _USE_MATH_DEFINES
 
 #include <cstdio>
@@ -86,7 +86,7 @@ public:
 		bounds[0] = b0;
 		bounds[1] = b1;
 	}
-
+	
 	bool intersect(const Ray& r, float& t) const
 	{
 		float tmin, tmax, tymin, tymax, tzmin, tzmax;
@@ -152,13 +152,8 @@ public:
 class Object
 {
 public:
-	Matrix44f objToWorld, worldToObj;
 	AABBox* bbox = nullptr;
-	Object(const Matrix44f objToWorld) 
-	{
-		this->objToWorld = objToWorld;
-		this->worldToObj = objToWorld.inverse();
-	}
+	Object() {}
 	virtual ~Object() {}
 	virtual bool intersect(const Ray&, float&, int&, float&, float&) const = 0;
 	virtual void getSurfaceProperties(const Vec3f&, const Vec3f&, const int&, const float&, const float&, Vec3f&, Vec2f&) const = 0;
@@ -182,10 +177,8 @@ public:
 		const unique_ptr<int[]>& vertsIndex,
 		const unique_ptr<Vec3f[]>& verts,
 		unique_ptr<Vec3f[]>& normals,
-		unique_ptr<Vec2f[]>& st,
-		const Matrix44f& objToWorld
-	) 
-		: Object(objToWorld)
+		unique_ptr<Vec2f[]>& st
+	)
 	{
 		this->numTris = 0;
 
@@ -203,12 +196,11 @@ public:
 
 		P = unique_ptr<Vec3f[]>(new Vec3f[maxVertIndex]);
 		for (int i = 0; i < maxVertIndex; ++i)
-			objToWorld.multVecMatrix(verts[i], P[i]);
+			P[i] = verts[i];
 
 		trisIndex = unique_ptr<int[]>(new int[numTris * 3LL]);
 		N = unique_ptr<Vec3f[]>(new Vec3f[numTris * 3]);
 		texCoordinates = unique_ptr<Vec2f[]>(new Vec2f[numTris * 3]);
-		Matrix44f transformNormals = worldToObj.transpose();
 		int l = 0;
 
 		for (int i = 0, k = 0; i < nfaces; ++i)
@@ -218,12 +210,9 @@ public:
 				trisIndex[l] = vertsIndex[k];
 				trisIndex[l + 1LL] = vertsIndex[(long long)k + j + 1LL];
 				trisIndex[l + 2LL] = vertsIndex[(long long)k + j + 2LL];
-				transformNormals.multDirMatrix(normals[k], N[l]);
-				transformNormals.multDirMatrix(normals[(long long)k + j + 1LL], N[l + 1LL]);
-				transformNormals.multDirMatrix(normals[(long long)k + j + 2LL], N[l + 2LL]);
-				N[l].normalize();
-				N[l + 1LL].normalize();
-				N[l + 2LL].normalize();
+				N[l] = normals[k];
+				N[l + 1LL] = normals[(long long)k + j + 1LL];
+				N[l + 2LL] = normals[(long long)k + j + 2LL];
 				texCoordinates[l] = st[k];
 				texCoordinates[l + 1LL] = st[(long long)k + j + 1LL];
 				texCoordinates[l + 2LL] = st[(long long)k + j + 2LL];
@@ -269,7 +258,9 @@ public:
 		const Vec3f& v0 = P[trisIndex[triIndex * 3LL]];
 		const Vec3f& v1 = P[trisIndex[triIndex * 3LL + 1LL]];
 		const Vec3f& v2 = P[trisIndex[triIndex * 3LL + 2LL]];
-		
+		hitNormal = (v1 - v0).crossProduct(v2 - v0);
+		hitNormal.normalize();
+
 		const Vec2f& st0 = texCoordinates[triIndex * 3LL];
 		const Vec2f& st1 = texCoordinates[triIndex * 3LL + 1LL];
 		const Vec2f& st2 = texCoordinates[triIndex * 3LL + 2LL];
@@ -279,14 +270,13 @@ public:
 		const Vec3f& n1 = N[triIndex * 3LL + 1LL];
 		const Vec3f& n2 = N[triIndex * 3LL + 2LL];
 		hitNormal = (1 - u - v) * n0 + u * n1 + v * n2;
-		hitNormal.normalize();
 	}
 
 	void vMinMax(Vec3f& vmin, Vec3f& vmax) const
 	{
 		vmin = INFINITY;
 		vmax = -INFINITY;
-
+		
 		for (int i = 0; i < this->numTris; ++i)
 		{
 			const Vec3f& v0 = this->P[this->trisIndex[i * 3LL]];
@@ -311,7 +301,7 @@ public:
 };
 
 
-TriangleMesh* loadPolyMeshFromFile(const char* file, const Matrix44f& objToWorld)
+TriangleMesh* loadPolyMeshFromFile(const char* file)
 {
 	ifstream ifs;
 	try
@@ -360,7 +350,7 @@ TriangleMesh* loadPolyMeshFromFile(const char* file, const Matrix44f& objToWorld
 			ss >> st[i].x >> st[i].y;
 		}
 
-		return new TriangleMesh(numFaces, faceIndex, vertsIndex, verts, normals, st, objToWorld);
+		return new TriangleMesh(numFaces, faceIndex, vertsIndex, verts, normals, st);
 	}
 
 	catch (...)
@@ -495,7 +485,7 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 	fprintf(stderr, "\rDone: %.2f (sec)\n", passedTime / 1000);
 
 
-	ofstream ofs("ray_traycing_echo_out.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_delta_out.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i)
 	{
@@ -517,27 +507,16 @@ int main()
 	Vec3f cam_origin(8, 5, 13), cam_target(0, 2, 7);
 	camToWorld = LookAt(cam_origin, cam_target);
 
-	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
-	
-	vector<unique_ptr<Object>> objects;
-	Matrix44f objToWorld_1 = Matrix44f();
-	
-	Matrix44f objToWorld_2_S = Matrix44f(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1);
-	Matrix44f objToWorld_2_R = Matrix44f((float)cos(M_PI / 6) , (float)-sin(M_PI / 6), 0, 0, (float)sin(M_PI / 6), (float)cos(M_PI / 6), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-	Matrix44f objToWorld_2_T = Matrix44f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -5, 13, 0, 1);
-	Matrix44f objToWorld_2_F = objToWorld_2_S * objToWorld_2_R * objToWorld_2_T;
+	Parameters parameters(500, 500, 60, camToWorld, cam_origin, cam_target);
 
-	TriangleMesh* mesh_1 = loadPolyMeshFromFile("data/teapot.geo", objToWorld_1);
-	TriangleMesh* mesh_2 = loadPolyMeshFromFile("data/teapot.geo", objToWorld_2_F);
+	vector<unique_ptr<Object>> objects;
+	TriangleMesh* mesh = loadPolyMeshFromFile("data/cow.geo");
 
 	Vec3f vmin, vmax;
-	mesh_1->vMinMax(vmin, vmax);
-	mesh_1->bbox = new AABBox(vmin, vmax);
-	mesh_2->vMinMax(vmin, vmax);
-	mesh_2->bbox = new AABBox(vmin, vmax);
-
-	objects.push_back(unique_ptr<Object>(mesh_1));
-	objects.push_back(unique_ptr<Object>(mesh_2));
+	mesh->vMinMax(vmin, vmax);
+	mesh->bbox = new AABBox(vmin, vmax);
+	
+	if (mesh != nullptr) objects.push_back(unique_ptr<Object>(mesh));
 
 	render(parameters, objects);
 }

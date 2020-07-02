@@ -1,5 +1,5 @@
-#define RAY_TRAYCER_FOXTROT_
-#ifdef RAY_TRAYCER_FOXTROT_1
+#define RAY_TRACER_ECHO_
+#ifdef RAY_TRACER_ECHO_1
 #define _USE_MATH_DEFINES
 
 #include <cstdio>
@@ -22,9 +22,6 @@ using namespace std;
 
 const float eps = 1e-8f;
 
-enum class RayType { PRIMARY_RAY, SHADOW_RAY };
-enum class MaterialType { DIFFUSE, REFLECTION, REFLECTION_REFRACTION };
-
 float clamp(const float& inf, const float& sup, const float& value)
 {
 	return max(inf, min(sup, value));
@@ -38,7 +35,7 @@ bool rayTriangleIntersectMT(const Vec3f& origin, const Vec3f& direction, const V
 	Vec3f Pvec = direction.crossProduct(v0v2);
 	float det = v0v1.dotProduct(Pvec);
 
-#define CULLING_
+#define CULLING_1
 #ifdef CULLING_1
 	if (det < eps) return false;
 #else
@@ -57,59 +54,8 @@ bool rayTriangleIntersectMT(const Vec3f& origin, const Vec3f& direction, const V
 
 	t = v0v2.dotProduct(Qvec) * invDet;
 
-	return (t > 0) ? true : false;
+	return true;
 }
-
-
-class Light
-{
-public:
-	Vec3f color;
-	float intensity;
-	Matrix44f lightToWorld;
-	Light(const Matrix44f& l2w, const Vec3f& c = 1, const float& i = 1) : lightToWorld(l2w), color(c), intensity(i) {}
-	virtual ~Light() {}
-	virtual void illuminate(const Vec3f&, Vec3f&, Vec3f&, float&) const = 0;
-};
-
-
-class DistantLight : public Light
-{
-	Vec3f dir;
-public:
-	DistantLight(const Matrix44f& l2w, const Vec3f& c = 1, const float& i = 1) : Light(l2w, c, i)
-	{
-		l2w.multDirMatrix(Vec3f(0, 0, -1), dir);
-		dir.normalize();
-	}
-	void illuminate(const Vec3f& P, Vec3f& lightDir, Vec3f& lightIntensity, float& distance) const
-	{
-		lightDir = dir;
-		lightIntensity = color * intensity;
-		distance = INFINITY;
-	}
-};
-
-
-class PointLight : public Light
-{
-	Vec3f pos;
-public:
-	PointLight(const Matrix44f& l2w, const Vec3f& c = 1, const float& i = 1) : Light(l2w, c, i)
-	{
-		l2w.multVecMatrix(Vec3f(0), pos);
-	}
-	void illuminate(const Vec3f& P, Vec3f& lightDir, Vec3f& lightIntensity, float& distance) const
-	{
-		lightDir = (P - pos);
-		// ??????????????????????????????????????????????????
-		float r2 = lightDir.norm();
-		distance = sqrt(r2);
-
-		lightDir.x /= distance, lightDir.y /= distance, lightDir.z /= distance;
-		lightIntensity = color * intensity / (4 * (float)M_PI * r2);
-	}
-};
 
 
 class Ray
@@ -190,9 +136,6 @@ public:
 	Matrix44f camToWorld;
 	Vec3f cam_origin;
 	Vec3f cam_direction;
-	Vec3f BGColor = Vec3f(0.2f, 0.7f, 0.8f);
-	int maxDepth = 10;
-	float bias = 0.0001f;
 
 	Parameters(int width, int height, float FOV, Matrix44f camToWorld, Vec3f cam_origin, Vec3f cam_direction)
 	{
@@ -211,11 +154,7 @@ class Object
 public:
 	Matrix44f objToWorld, worldToObj;
 	AABBox* bbox = nullptr;
-	MaterialType type = MaterialType::DIFFUSE;
-	float RefractIndex = 1;
-	Vec3f albedo = 0.18f;
-
-	Object(const Matrix44f objToWorld)
+	Object(const Matrix44f objToWorld) 
 	{
 		this->objToWorld = objToWorld;
 		this->worldToObj = objToWorld.inverse();
@@ -235,7 +174,6 @@ public:
 	unique_ptr<int[]> trisIndex;
 	unique_ptr<Vec3f[]> N;
 	unique_ptr<Vec2f[]> texCoordinates;
-	bool smoothShading = true;
 
 	TriangleMesh
 	(
@@ -246,7 +184,7 @@ public:
 		unique_ptr<Vec3f[]>& normals,
 		unique_ptr<Vec2f[]>& st,
 		const Matrix44f& objToWorld
-	)
+	) 
 		: Object(objToWorld)
 	{
 		this->numTris = 0;
@@ -328,26 +266,20 @@ public:
 		Vec2f& hitTextureCoordinates
 	) const
 	{
-		if (smoothShading)
-		{
-			const Vec3f& n0 = N[triIndex * 3LL];
-			const Vec3f& n1 = N[triIndex * 3LL + 1LL];
-			const Vec3f& n2 = N[triIndex * 3LL + 2LL];
-			hitNormal = (1 - u - v) * n0 + u * n1 + v * n2;
-		}
-		else
-		{
-			const Vec3f& v0 = P[trisIndex[triIndex * 3LL]];
-			const Vec3f& v1 = P[trisIndex[triIndex * 3LL + 1LL]];
-			const Vec3f& v2 = P[trisIndex[triIndex * 3LL + 2LL]];
-			hitNormal = (v1 - v0).crossProduct(v2 - v0);
-		}
-		hitNormal.normalize();
-
+		const Vec3f& v0 = P[trisIndex[triIndex * 3LL]];
+		const Vec3f& v1 = P[trisIndex[triIndex * 3LL + 1LL]];
+		const Vec3f& v2 = P[trisIndex[triIndex * 3LL + 2LL]];
+		
 		const Vec2f& st0 = texCoordinates[triIndex * 3LL];
 		const Vec2f& st1 = texCoordinates[triIndex * 3LL + 1LL];
 		const Vec2f& st2 = texCoordinates[triIndex * 3LL + 2LL];
 		hitTextureCoordinates = (1 - u - v) * st0 + u * st1 + v * st2;
+
+		const Vec3f& n0 = N[triIndex * 3LL];
+		const Vec3f& n1 = N[triIndex * 3LL + 1LL];
+		const Vec3f& n2 = N[triIndex * 3LL + 2LL];
+		hitNormal = (1 - u - v) * n0 + u * n1 + v * n2;
+		hitNormal.normalize();
 	}
 
 	void vMinMax(Vec3f& vmin, Vec3f& vmax) const
@@ -376,16 +308,6 @@ public:
 			if (zmax > vmax.z) vmax.z = zmax;
 		}
 	}
-};
-
-
-class IntersectionObjInfo
-{
-public:
-	const Object* hitObj = nullptr;
-	float t_min = INFINITY;
-	float u, v;
-	int index = 0;
 };
 
 
@@ -481,176 +403,66 @@ bool trace
 (
 	const Ray& ray,
 	const vector<unique_ptr<Object>>& objects,
-	IntersectionObjInfo& hitObjInfo,
-	RayType rayType = RayType::PRIMARY_RAY
+	float& t_min, float& u_final, float& v_final,
+	int& hitTrianIndex, const Object*& hitObj
 )
 {
-	hitObjInfo.hitObj = nullptr;
 	vector<unique_ptr<Object>>::const_iterator iter;
 	float t_bb;
-	
+
 	for (iter = objects.begin(); iter != objects.end(); ++iter)
 	{
 		AABBox* bbPtr = (*iter)->bbox;
 		if ((bbPtr != nullptr) && !(bbPtr->intersect(ray, t_bb))) continue;
 
 		float t = INFINITY, u, v;
-		int index = 0;
+		int TrianID;
 		bool isIntersect;
 
-		isIntersect = (*iter)->intersect(ray, t, index, u, v);
+		isIntersect = (*iter)->intersect(ray, t, TrianID, u, v);
 
-		if (isIntersect && (t < hitObjInfo.t_min))
+		if (isIntersect && (t < t_min))
 		{
-			if (rayType == RayType::SHADOW_RAY && (*iter)->type == MaterialType::REFLECTION_REFRACTION) continue;
-			hitObjInfo.hitObj = (iter)->get();
-			hitObjInfo.t_min = t;
-			hitObjInfo.index = index;
-			hitObjInfo.u = u;
-			hitObjInfo.v = v;
+			hitObj = (iter)->get();
+			t_min = t;
+			hitTrianIndex = TrianID;
+			u_final = u;
+			v_final = v;
 		}
 	}
-	return (hitObjInfo.hitObj != nullptr);
+
+	return (hitObj != nullptr);
 }
 
 
-Vec3f reflect(const Vec3f& I, const Vec3f& N)
-{
-	return I - 2 * I.dotProduct(N) * N;
-}
 
-
-Vec3f refract(const Vec3f& I, const Vec3f& N, const float& refractIndex)
+Vec3f castRay(const Ray& ray, const vector<unique_ptr<Object>>& objects)
 {
-	float cos_src = clamp(-1, 1, I.dotProduct(N));
-	float refrIndex_src = 1, refrIndex_dst = refractIndex;
-	Vec3f n = N;
-	if (cos_src < 0) cos_src = -cos_src;
-	else
+	Vec3f hitColor(0.2f, 0.7f, 0.8f);
+	const Object* hitObj = nullptr;
+	int hitTrianIndex = 0;
+	float t = INFINITY, u, v;
+
+	if (trace(ray, objects, t, u, v, hitTrianIndex, hitObj))
 	{
-		swap(refrIndex_src, refrIndex_dst);
-		n = -N;
-	}
-	float refrIndex = refrIndex_src / refrIndex_dst;
-	float k = 1 - refrIndex * refrIndex * (1 - cos_src * cos_src);
-	return k < 0 ? 0 : refrIndex * I + (refrIndex * cos_src - sqrtf(k)) * n;
-}
-
-
-void fresnel(const Vec3f& I, const Vec3f& N, const float& refractIndex, float& fresnelReflect)
-{
-	float cos_src = clamp(-1, 1, I.dotProduct(N));
-	float refrIndex_src = 1, refrIndex_dst = refractIndex;
-	
-	if (cos_src > 0) swap(refrIndex_src, refrIndex_dst);
-	float sin_dst = refrIndex_src / refrIndex_dst * sqrtf(max(0.f, 1 - cos_src * cos_src));
-
-	if (sin_dst >= 1) fresnelReflect = 1;
-	else
-	{
-		cos_src = fabsf(cos_src);
-		float cos_dst = sqrtf(max(0.f, 1 - sin_dst * sin_dst));
-		float R_1 = (refrIndex_dst * cos_src - refrIndex_src * cos_dst) / (refrIndex_dst * cos_src + refrIndex_src * cos_dst);
-		float R_2 = (refrIndex_src * cos_dst - refrIndex_dst * cos_src) / (refrIndex_src * cos_dst + refrIndex_dst * cos_src);
-		fresnelReflect = (R_1 * R_1 + R_2 * R_2) / 2;
-	}
-}
-
-
-Vec3f castRay
-(
-	const Ray& ray, 
-	const vector<unique_ptr<Object>>& objects, 
-	const vector<unique_ptr<Light>>& lights, 
-	const Parameters& param, 
-	const int depth = 0
-)
-{
-	if (depth > param.maxDepth) return param.BGColor;
-	Vec3f hitColor(0);
-	IntersectionObjInfo hitObjInfo;
-
-	if (trace(ray, objects, hitObjInfo))
-	{
-		Vec3f hitPoint = ray.orig + hitObjInfo.t_min * ray.dir;
+		Vec3f hitPoint = ray.orig + t * ray.dir;
 		Vec3f hitNormal;
 		Vec2f hitTexCoordinates;
-		hitObjInfo.hitObj->getSurfaceProperties(hitPoint, ray.dir, hitObjInfo.index, hitObjInfo.u, hitObjInfo.v, hitNormal, hitTexCoordinates);
+		hitObj->getSurfaceProperties(hitPoint, ray.dir, hitTrianIndex, u, v, hitNormal, hitTexCoordinates);
 
-		switch (hitObjInfo.hitObj->type)
-		{
-		case MaterialType::DIFFUSE:
-		{
-			for (int i = 0; i < lights.size(); ++i)
-			{
-				Vec3f lightDir, lightIntens;
-				IntersectionObjInfo hitObjShadowInfo;
-				lights[i]->illuminate(hitPoint, lightDir, lightIntens, hitObjShadowInfo.t_min);
+		float NdotDir = max(0.f, hitNormal.dotProduct(-ray.dir));
+		const int M = 10;
+		float checker = (float)((fmod(hitTexCoordinates.x * M, 1.0f) > 0.5f) ^ (fmod(hitTexCoordinates.y * M, 1.0f) < 0.5f));
+		float c = 0.3f * (1.0f - checker) + 0.7f * checker;
 
-				Ray shadowRay(hitPoint + hitNormal * param.bias, -lightDir);
-				bool vis = !trace(shadowRay, objects, hitObjShadowInfo, RayType::SHADOW_RAY);
-				
-				float angle = 45 * M_PI / 180;
-				float s = hitTexCoordinates.x * cos(angle) - hitTexCoordinates.y * sin(angle);
-				float t = hitTexCoordinates.y * cos(angle) + hitTexCoordinates.x * sin(angle);
-				float scaleS = 20.f, scaleT = 20.f;
-				float pattern = (s * scaleS - (float)floor(s * scaleS) < 0.5f);
-
-				hitColor += vis * pattern * /*hitObjInfo.hitObj->albedo * */ lightIntens * max(0.f, hitNormal.dotProduct(-lightDir));
-			}
-			break;
-		}
-		case MaterialType::REFLECTION:
-		{
-			Vec3f R = reflect(ray.dir, hitNormal);
-			R.normalize();
-			Ray reflectRay(hitPoint + hitNormal * param.bias, R);
-			hitColor += 0.8f * castRay(reflectRay, objects, lights, param, depth + 1);
-			break;
-		}
-		case MaterialType::REFLECTION_REFRACTION:
-		{
-			Vec3f refractionColor = 0, reflectionColor = 0;
-			float fresnelReflect;
-			fresnel(ray.dir, hitNormal, hitObjInfo.hitObj->RefractIndex, fresnelReflect);
-			bool outside = ray.dir.dotProduct(hitNormal) < 0;
-			Vec3f bias = param.bias * hitNormal;
-
-			if (fresnelReflect < 1)
-			{
-				Vec3f refractionRayOrig = outside ? hitPoint - bias : hitPoint + bias;
-				Vec3f refractionDirection = refract(ray.dir, hitNormal, hitObjInfo.hitObj->RefractIndex).normalize();
-				Ray refractRay(refractionRayOrig, refractionDirection);
-				refractionColor = castRay(refractRay, objects, lights, param, depth + 1);
-			}
-
-			Vec3f reflectionRayOrig = outside ? hitPoint + bias : hitPoint - bias;
-			Vec3f reflectionDirection = reflect(ray.dir, hitNormal).normalize();
-			Ray reflectRay(reflectionRayOrig, reflectionDirection);
-			reflectionColor = castRay(reflectRay, objects, lights, param, depth + 1);
-
-			hitColor += reflectionColor * fresnelReflect + refractionColor * (1 - fresnelReflect);
-			break;
-		}
-		default:
-			break;
-		}
-	}
-	else
-	{
-		hitColor = param.BGColor;
+		hitColor = c * NdotDir;
 	}
 
 	return hitColor;
 }
 
 
-void render
-(
-	const Parameters& parameters, 
-	const vector<unique_ptr<Object>>& objects, 
-	const vector<unique_ptr<Light>>& lights
-)
+void render(const Parameters& parameters, const vector<unique_ptr<Object>>& objects)
 {
 	Vec3f* frameBuffer = new Vec3f[parameters.width * parameters.height];
 	Vec3f* pixel_curr = frameBuffer;
@@ -674,7 +486,7 @@ void render
 			direction.normalize();
 
 			Ray ray(origin, direction);
-			*(pixel_curr++) = castRay(ray, objects, lights, parameters);
+			*(pixel_curr++) = castRay(ray, objects);
 		}
 		fprintf(stderr, "\r%3d%c", int(j / (float)parameters.height * 100), '%');
 	}
@@ -683,7 +495,7 @@ void render
 	fprintf(stderr, "\rDone: %.2f (sec)\n", passedTime / 1000);
 
 
-	ofstream ofs("ray_traycing_foxtrot_out.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_echo_out.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i)
 	{
@@ -702,48 +514,32 @@ void render
 int main()
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin(8, 5, 13), cam_target(0, 2, 7);
 	camToWorld = LookAt(cam_origin, cam_target);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
-	parameters.camToWorld = Matrix44f(0.999945, 0, 0.0104718, 0, 0.00104703, 0.994989, -0.0999803, 0, -0.0104193, 0.0999858, 0.994934, 0, -0.978596, 12.911879, 50.483369, 1);
-	Vec3f vmin, vmax;
-
+	
 	vector<unique_ptr<Object>> objects;
+	Matrix44f objToWorld_1 = Matrix44f();
+	
+	Matrix44f objToWorld_2_S = Matrix44f(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1);
+	Matrix44f objToWorld_2_R = Matrix44f((float)cos(M_PI / 6) , (float)-sin(M_PI / 6), 0, 0, (float)sin(M_PI / 6), (float)cos(M_PI / 6), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+	Matrix44f objToWorld_2_T = Matrix44f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -5, 13, 0, 1);
+	Matrix44f objToWorld_2_F = objToWorld_2_S * objToWorld_2_R * objToWorld_2_T;
 
-	TriangleMesh* mesh_1 = loadPolyMeshFromFile("data/glasses.geo", Matrix44f());
-	mesh_1->type = MaterialType::REFLECTION_REFRACTION;
-	mesh_1->RefractIndex = 1.3;
+	TriangleMesh* mesh_1 = loadPolyMeshFromFile("data/teapot.geo", objToWorld_1);
+	TriangleMesh* mesh_2 = loadPolyMeshFromFile("data/teapot.geo", objToWorld_2_F);
+
+	Vec3f vmin, vmax;
 	mesh_1->vMinMax(vmin, vmax);
 	mesh_1->bbox = new AABBox(vmin, vmax);
-	objects.push_back(std::unique_ptr<Object>(mesh_1));
-
-	TriangleMesh* mesh_2 = loadPolyMeshFromFile("data/backdrop1.geo", Matrix44f());
-	mesh_2->type = MaterialType::DIFFUSE;
-	mesh_2->albedo = 0.18;
 	mesh_2->vMinMax(vmin, vmax);
 	mesh_2->bbox = new AABBox(vmin, vmax);
-	objects.push_back(std::unique_ptr<Object>(mesh_2));
 
+	objects.push_back(unique_ptr<Object>(mesh_1));
+	objects.push_back(unique_ptr<Object>(mesh_2));
 
-	Matrix44f xform;
-	xform[0][0] = 10;
-	xform[1][1] = 10;
-	xform[2][2] = 10;
-	xform[3][2] = -40;
-	TriangleMesh* mesh = loadPolyMeshFromFile("data/plane.geo", xform);
-	mesh->type = MaterialType::DIFFUSE;
-	mesh->albedo = Vec3f(0, 0.4, 0);
-	mesh->smoothShading = false;
-	//objects.push_back(unique_ptr<Object>(mesh));
-	
-
-	vector<unique_ptr<Light>> lights;
-	//Matrix44f l2w = Matrix44f();
-	Matrix44f l2w(0.95292, 0.289503, 0.0901785, 0, -0.0960954, 0.5704, -0.815727, 0, -0.287593, 0.768656, 0.571365, 0, 0, 0, 0, 1);
-	lights.push_back(unique_ptr<Light>(new DistantLight(l2w, 1, 1)));
-	
-	render(parameters, objects, lights);
+	render(parameters, objects);
 }
 
 

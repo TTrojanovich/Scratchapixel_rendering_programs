@@ -1,5 +1,5 @@
-#define RAY_TRAYCER_GAMMA_
-#ifdef RAY_TRAYCER_GAMMA_1
+#define RAY_TRACER_GAMMA_
+#ifdef RAY_TRACER_GAMMA_1
 #define _USE_MATH_DEFINES
 
 #include <cstdio>
@@ -706,7 +706,7 @@ void render
 	fprintf(stderr, "\rDone: %.2f (sec)\n", passedTime / 1000);
 
 
-	ofstream ofs("ray_traycing_gamma_out_3.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_gamma_out_3.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i)
 	{

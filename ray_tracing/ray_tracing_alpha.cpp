@@ -1,5 +1,5 @@
-#define RAY_TRAYCER_ALPHA_
-#ifdef RAY_TRAYCER_ALPHA_1
+#define RAY_TRACER_ALPHA_
+#ifdef RAY_TRACER_ALPHA_1
 #define _USE_MATH_DEFINES
 
 #include <cstdio>
@@ -214,7 +214,7 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 		}
 	}
 
-	ofstream ofs("ray_traycing_alpha_out.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_alpha_out.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i) 
 	{
