@@ -514,8 +514,9 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 int main()
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(8, 5, 13), cam_target(0, 2, 7);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin_world(20, 10, 10), cam_target_world(0, 7, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
 	

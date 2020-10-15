@@ -706,7 +706,7 @@ void render
 	fprintf(stderr, "\rDone: %.2f (sec)\n", passedTime / 1000);
 
 
-	ofstream ofs("ray_tracing_gamma_out_3.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_gamma_out_4.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i)
 	{
@@ -725,14 +725,14 @@ void render
 int main()
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(8, 5, 13), cam_target(0, 2, 7);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin_world(20, 13, 13), cam_target_world(0, 5, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
 	Vec3f vmin, vmax;
 
 	vector<unique_ptr<Object>> objects;
-
 
 	Matrix44f objToWorld_1 = Matrix44f();
 	TriangleMesh* mesh_1 = loadPolyMeshFromFile("data/teapot.geo", objToWorld_1);
@@ -751,7 +751,6 @@ int main()
 	mesh->type = MaterialType::REFLECTION;
 	mesh->smoothShading = false;
 	objects.push_back(unique_ptr<Object>(mesh));
-
 
 	vector<unique_ptr<Light>> lights;
 	Matrix44f l2w = Matrix44f();

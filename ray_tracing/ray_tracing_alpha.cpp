@@ -206,6 +206,7 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 
 			Vec3f origin;
 			parameters.camToWorld.multVecMatrix(parameters.cam_origin, origin);
+			//cout << parameters.cam_origin << " " << origin << endl;
 			Vec3f direction;
 			parameters.camToWorld.multDirMatrix(Vec3f(x, y, -1), direction);
 			direction.normalize();
@@ -214,7 +215,7 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 		}
 	}
 
-	ofstream ofs("ray_tracing_alpha_out.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_alpha_out_2.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i) 
 	{
@@ -233,8 +234,9 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 int main()
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(-5, 0, 10), cam_target(0, 0, -1);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin_world(0, 0, 10), cam_target_world(0, 0, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
 

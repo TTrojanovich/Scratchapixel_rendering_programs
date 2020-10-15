@@ -86,7 +86,7 @@ public:
 		bounds[0] = b0;
 		bounds[1] = b1;
 	}
-	
+
 	bool intersect(const Ray& r, float& t) const
 	{
 		float tmin, tmax, tymin, tymax, tzmin, tzmax;
@@ -276,7 +276,7 @@ public:
 	{
 		vmin = INFINITY;
 		vmax = -INFINITY;
-		
+
 		for (int i = 0; i < this->numTris; ++i)
 		{
 			const Vec3f& v0 = this->P[this->trisIndex[i * 3LL]];
@@ -504,8 +504,9 @@ void render(const Parameters& parameters, const vector<unique_ptr<Object>>& obje
 int main()
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(8, 5, 13), cam_target(0, 2, 7);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin_world(20, 10, 10), cam_target_world(0, 5, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(500, 500, 60, camToWorld, cam_origin, cam_target);
 
@@ -515,7 +516,7 @@ int main()
 	Vec3f vmin, vmax;
 	mesh->vMinMax(vmin, vmax);
 	mesh->bbox = new AABBox(vmin, vmax);
-	
+
 	if (mesh != nullptr) objects.push_back(unique_ptr<Object>(mesh));
 
 	render(parameters, objects);

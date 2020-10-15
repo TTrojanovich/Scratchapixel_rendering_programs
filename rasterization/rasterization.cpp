@@ -1,4 +1,4 @@
-#define RASTERIZATION_1
+#define RASTERIZATION_
 #ifdef RASTERIZATION_1
 #define _USE_MATH_DEFINES
 
@@ -225,7 +225,7 @@ void convertToRaster
 )
 {
 	Vec3f vertexCamera;
-
+	
 	worldToCamera.multVecMatrix(vertexWorld, vertexCamera);
 
 	Vec2f vertexScreen;
@@ -394,8 +394,9 @@ void render(const Parameters& param)
 int main(int argc, char** argv)
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(20, 15, 25), cam_target(0, 5, -1);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin_world(20, 15, 25), cam_target_world(0, 5, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 	Matrix44f worldToCamera = camToWorld.inverse();
 
 	Parameters param(800, 800, worldToCamera, camToWorld, cam_origin, cam_target);

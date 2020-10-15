@@ -703,7 +703,8 @@ int main()
 {
 	Matrix44f camToWorld;
 	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin_world(0, 0, 0), cam_target_world(0, 0, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
 	parameters.camToWorld = Matrix44f(0.999945, 0, 0.0104718, 0, 0.00104703, 0.994989, -0.0999803, 0, -0.0104193, 0.0999858, 0.994934, 0, -0.978596, 12.911879, 50.483369, 1);

@@ -250,8 +250,9 @@ void render(const Parameters& parameters, const vector<unique_ptr<Triangle>>& tr
 int main()
 {
 	Matrix44f camToWorld;
-	Vec3f cam_origin(6, 0, 5), cam_target(0, 2, 0);
-	camToWorld = LookAt(cam_origin, cam_target);
+	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
+	Vec3f cam_origin_world(3, 0, 5), cam_target_world(0, 0, -1);
+	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
 
