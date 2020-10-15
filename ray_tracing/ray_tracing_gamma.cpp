@@ -79,7 +79,7 @@ class DistantLight : public Light
 public:
 	DistantLight(const Matrix44f& l2w, const Vec3f& c = 1, const float& i = 1) : Light(l2w, c, i)
 	{
-		l2w.multDirMatrix(Vec3f(0, 0, -1), dir);
+		l2w.multDirMatrix(Vec3f(0, -0.3, -1), dir);
 		dir.normalize();
 	}
 	void illuminate(const Vec3f& P, Vec3f& lightDir, Vec3f& lightIntensity, float& distance) const
@@ -101,8 +101,7 @@ public:
 	}
 	void illuminate(const Vec3f& P, Vec3f& lightDir, Vec3f& lightIntensity, float& distance) const
 	{
-		lightDir = (P - pos);
-		// ??????????????????????????????????????????????????
+		lightDir = P - pos;
 		float r2 = lightDir.norm();
 		distance = sqrt(r2);
 
@@ -593,13 +592,7 @@ Vec3f castRay
 				Ray shadowRay(hitPoint + hitNormal * param.bias, -lightDir);
 				bool vis = !trace(shadowRay, objects, hitObjShadowInfo, RayType::SHADOW_RAY);
 
-				float angle = 45 * M_PI / 180;
-				float s = hitTexCoordinates.x * cos(angle) - hitTexCoordinates.y * sin(angle);
-				float t = hitTexCoordinates.y * cos(angle) + hitTexCoordinates.x * sin(angle);
-				float scaleS = 20.f, scaleT = 20.f;
-				float pattern = (s * scaleS - (float)floor(s * scaleS) < 0.5f);
-
-				hitColor += vis * /*pattern * */ hitObjInfo.hitObj->albedo * lightIntens * max(0.f, hitNormal.dotProduct(-lightDir));
+				hitColor += vis * hitObjInfo.hitObj->albedo * lightIntens * max(0.f, hitNormal.dotProduct(-lightDir));
 			}
 			break;
 		}
@@ -648,7 +641,7 @@ Vec3f castRay
 				bool vis = !trace(shadowRay, objects, hitObjShadowInfo, RayType::SHADOW_RAY);
 
 				diffuse += vis * hitObjInfo.hitObj->albedo * lightIntens * max(0.f, hitNormal.dotProduct(-lightDir));
-
+				
 				Vec3f R = reflect(lightDir, hitNormal);
 				specular += vis * lightIntens * pow(max(0.f, R.dotProduct(-ray.dir)), hitObjInfo.hitObj->spec_power);
 			}
@@ -706,7 +699,7 @@ void render
 	fprintf(stderr, "\rDone: %.2f (sec)\n", passedTime / 1000);
 
 
-	ofstream ofs("ray_tracing_gamma_out_4.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_gamma_out_6.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i)
 	{
@@ -726,7 +719,7 @@ int main()
 {
 	Matrix44f camToWorld;
 	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
-	Vec3f cam_origin_world(20, 13, 13), cam_target_world(0, 5, -1);
+	Vec3f cam_origin_world(-15, 20, 25), cam_target_world(-5, 5, -1);
 	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
@@ -734,7 +727,7 @@ int main()
 
 	vector<unique_ptr<Object>> objects;
 
-	Matrix44f objToWorld_1 = Matrix44f();
+	Matrix44f objToWorld_1 = Matrix44f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -4, 1);
 	TriangleMesh* mesh_1 = loadPolyMeshFromFile("data/teapot.geo", objToWorld_1);
 	mesh_1->type = MaterialType::PHONG;
 	mesh_1->albedo = Vec3f(0.5, 0, 0);
@@ -748,13 +741,17 @@ int main()
 	xform[2][2] = 10;
 	xform[3][2] = -40;
 	TriangleMesh* mesh = loadPolyMeshFromFile("data/plane.geo", xform);
-	mesh->type = MaterialType::REFLECTION;
+	//mesh->type = MaterialType::REFLECTION;
+	mesh->type = MaterialType::DIFFUSE;
 	mesh->smoothShading = false;
+	mesh->albedo = Vec3f(0, 0.5, 0);
 	objects.push_back(unique_ptr<Object>(mesh));
 
 	vector<unique_ptr<Light>> lights;
-	Matrix44f l2w = Matrix44f();
-	lights.push_back(unique_ptr<Light>(new DistantLight(l2w, 1, 1)));
+	//Matrix44f l2w_point = Matrix44f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -5, 20, 10, 1);
+	//lights.push_back(unique_ptr<Light>(new PointLight(l2w_point, 1, 5000)));
+	Matrix44f l2w_distant = Matrix44f();
+	lights.push_back(unique_ptr<Light>(new DistantLight(l2w_distant, 1, 1)));
 
 	render(parameters, objects, lights);
 }

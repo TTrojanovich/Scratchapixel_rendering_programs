@@ -79,7 +79,7 @@ class DistantLight : public Light
 public:
 	DistantLight(const Matrix44f& l2w, const Vec3f& c = 1, const float& i = 1) : Light(l2w, c, i)
 	{
-		l2w.multDirMatrix(Vec3f(0, 0, -1), dir);
+		l2w.multDirMatrix(Vec3f(0, -1, -1), dir);
 		dir.normalize();
 	}
 	void illuminate(const Vec3f& P, Vec3f& lightDir, Vec3f& lightIntensity, float& distance) const
@@ -101,8 +101,7 @@ public:
 	}
 	void illuminate(const Vec3f& P, Vec3f& lightDir, Vec3f& lightIntensity, float& distance) const
 	{
-		lightDir = (P - pos);
-		// ??????????????????????????????????????????????????
+		lightDir = P - pos;
 		float r2 = lightDir.norm();
 		distance = sqrt(r2);
 
@@ -683,7 +682,7 @@ void render
 	fprintf(stderr, "\rDone: %.2f (sec)\n", passedTime / 1000);
 
 
-	ofstream ofs("ray_tracing_foxtrot_out.ppm", ios::out | ios::binary);
+	ofstream ofs("ray_tracing_foxtrot_out_2.ppm", ios::out | ios::binary);
 	ofs << "P6\n" << parameters.width << " " << parameters.height << "\n255\n";
 	for (int i = 0; i < parameters.width * parameters.height; ++i)
 	{
@@ -703,13 +702,12 @@ int main()
 {
 	Matrix44f camToWorld;
 	Vec3f cam_origin(0, 0, 0), cam_target(0, 0, -1);
-	Vec3f cam_origin_world(0, 0, 0), cam_target_world(0, 0, -1);
+	Vec3f cam_origin_world(0, 13, 50), cam_target_world(0, 3, -1);
 	camToWorld = LookAt(cam_origin_world, cam_target_world);
 
 	Parameters parameters(800, 800, 60, camToWorld, cam_origin, cam_target);
-	parameters.camToWorld = Matrix44f(0.999945, 0, 0.0104718, 0, 0.00104703, 0.994989, -0.0999803, 0, -0.0104193, 0.0999858, 0.994934, 0, -0.978596, 12.911879, 50.483369, 1);
 	Vec3f vmin, vmax;
-
+	
 	vector<unique_ptr<Object>> objects;
 
 	TriangleMesh* mesh_1 = loadPolyMeshFromFile("data/glasses.geo", Matrix44f());
@@ -726,23 +724,11 @@ int main()
 	mesh_2->bbox = new AABBox(vmin, vmax);
 	objects.push_back(std::unique_ptr<Object>(mesh_2));
 
-
-	Matrix44f xform;
-	xform[0][0] = 10;
-	xform[1][1] = 10;
-	xform[2][2] = 10;
-	xform[3][2] = -40;
-	TriangleMesh* mesh = loadPolyMeshFromFile("data/plane.geo", xform);
-	mesh->type = MaterialType::DIFFUSE;
-	mesh->albedo = Vec3f(0, 0.4, 0);
-	mesh->smoothShading = false;
-	//objects.push_back(unique_ptr<Object>(mesh));
-	
-
 	vector<unique_ptr<Light>> lights;
-	//Matrix44f l2w = Matrix44f();
-	Matrix44f l2w(0.95292, 0.289503, 0.0901785, 0, -0.0960954, 0.5704, -0.815727, 0, -0.287593, 0.768656, 0.571365, 0, 0, 0, 0, 1);
-	lights.push_back(unique_ptr<Light>(new DistantLight(l2w, 1, 1)));
+	//Matrix44f l2w_point = Matrix44f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 13, 10, 1);
+	//lights.push_back(unique_ptr<Light>(new PointLight(l2w_point, 1, 4000)));
+	Matrix44f l2w_distant = Matrix44f();
+	lights.push_back(unique_ptr<Light>(new DistantLight(l2w_distant, 1, 1)));
 	
 	render(parameters, objects, lights);
 }
