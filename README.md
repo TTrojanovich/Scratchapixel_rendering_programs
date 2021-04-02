@@ -1,4 +1,4 @@
-# Scratchapixel_rendering_programs
+# Scratchapixel rendering programs
 Some render practice from Scratchapixel.com
 
 Features:
